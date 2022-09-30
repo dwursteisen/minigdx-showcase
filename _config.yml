@@ -1,0 +1,26 @@
+# Site settings
+title: miniGDX showcase
+email: david.wursteisen+minigdx@gmail.com
+description: > # this means to ignore newlines until "baseurl:"
+  Minimalist 3D Multiplatform Game Engine In Kotlin.
+baseurl:  # the subpath of your site, e.g. /blog/
+url:  # the base hostname & protocol for your site
+twitter_username: twitter_username
+github_username:  minigdx
+
+# Build settings
+markdown: kramdown
+
+highlighter: rouge
+
+# Pagination
+paginate: 15
+paginate_path: "/showcases/page:num/"
+
+collections:
+  - links
+
+plugins:
+  - jekyll-paginate
+
+exclude: ['build', '.gradle', '_site',]
