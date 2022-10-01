@@ -6,3 +6,4 @@ _site
 .gradle
 .jekyll-cache
 build
+js/distributions
