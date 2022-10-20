@@ -21,16 +21,6 @@ import com.github.dwursteisen.minigdx.shaders.ShaderParameter
 import com.github.dwursteisen.minigdx.shaders.fragment.FragmentShader
 
 private val shader = """
-        #ifdef GL_ES
-        precision highp float;
-        #endif
-        
-        uniform sampler2D uSprite;
-        uniform vec2 uAmplitude;
-        uniform float uTime;
-        varying vec2 inputUV;
-        
-
         void main() {
               float xOffset = inputUV.x + cos(inputUV.y * uAmplitude.y + uTime * uAmplitude.x) * 0.1;
               vec2 offset = vec2(clamp(0.0, 1.0, xOffset), inputUV.y);
@@ -42,8 +32,9 @@ class GhostFragmentShader : FragmentShader(shader) {
     val uSprite = ShaderParameter.UniformSample2D("uSprite")
     val uAmplitude = ShaderParameter.UniformVec2("uAmplitude")
     val uTime = ShaderParameter.UniformFloat("uTime")
+    private val inputUV = ShaderParameter.VaryingVec2("inputUV")
 
-    override val parameters: List<ShaderParameter> = listOf(uSprite, uAmplitude, uTime)
+    override val parameters: List<ShaderParameter> = listOf(uSprite, uAmplitude, uTime, inputUV)
 }
 
 class GhostShader(override val gameContext: GameContext) : Game {
