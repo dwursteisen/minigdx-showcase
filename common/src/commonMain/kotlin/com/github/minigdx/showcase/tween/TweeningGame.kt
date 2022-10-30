@@ -6,7 +6,7 @@ import com.github.dwursteisen.minigdx.Seconds
 import com.github.dwursteisen.minigdx.ecs.Engine
 import com.github.dwursteisen.minigdx.ecs.components.Component
 import com.github.dwursteisen.minigdx.ecs.components.position.Tween
-import com.github.dwursteisen.minigdx.ecs.components.position.Tweening
+import com.github.dwursteisen.minigdx.ecs.components.position.TweenFactoryComponent
 import com.github.dwursteisen.minigdx.ecs.entities.Entity
 import com.github.dwursteisen.minigdx.ecs.entities.EntityFactory
 import com.github.dwursteisen.minigdx.ecs.entities.position
@@ -15,36 +15,60 @@ import com.github.dwursteisen.minigdx.ecs.systems.System
 import com.github.dwursteisen.minigdx.file.get
 import com.github.dwursteisen.minigdx.game.Game
 import com.github.dwursteisen.minigdx.graph.GraphScene
+import com.github.dwursteisen.minigdx.math.Interpolation
+import com.github.dwursteisen.minigdx.math.Interpolations
 import com.github.dwursteisen.minigdx.math.Vector3
 import com.github.minigdx.imgui.ImGui
 
-class TweenComponent(var name: String, var active: Boolean, val tween: Tween, val values: Vector3) : Component
+class TweenScaleComponent(val tween: Tween<Vector3>) : Component
+class TweenRotationComponent(val tween: Tween<Float>) : Component
 
-class TweenSystem : System(EntityQuery.of(TweenComponent::class)) {
+class TweenScaleSystem : System(EntityQuery.of(TweenScaleComponent::class)) {
+
+    lateinit var current: Interpolation
+
+    override fun onEntityAdded(entity: Entity) {
+        current = entity.get(TweenScaleComponent::class).tween.interpolation
+    }
 
     override fun update(delta: Seconds, entity: Entity) {
-        val tweenComponents = entity.findAll(TweenComponent::class)
-        tweenComponents.forEach { tweenComponent ->
-            val percent = tweenComponent.tween.update(delta)
-            if (tweenComponent.active) {
-                entity.position.setLocalScale(tweenComponent.values)
-            }
-            if (percent >= 1.0f) {
-                tweenComponent.tween.reset()
-                tweenComponent.tween.reverse = !tweenComponent.tween.reverse
-            }
+        val tweenComponent = entity.get(TweenScaleComponent::class)
+        entity.position.setLocalScale(tweenComponent.tween.current.value)
 
-            with(ImGui) {
-                container("Tweening") {
-                    label("Interpolation: ${tweenComponent.name}")
-                    if (button("Active interpolation")) {
-                        tweenComponents.forEach {
-                            it.active = false
-                            tweenComponent.active = true
-                        }
-                    }
+        with(ImGui) {
+            container("Scale") {
+                label("Current Interpolation: $current")
+                if (button("Next interpolation")) {
+                    val index = Interpolations.all.indexOf(current)
+                    val newIndex = (index + 1) % Interpolations.all.size
+                    current = Interpolations.all[newIndex]
+                    tweenComponent.tween.interpolation = current
+                }
+            }
+        }
+    }
+}
 
-                    checkbox("Is Active", tweenComponent.active)
+class TweenRotationSystem : System(EntityQuery.Companion.of(TweenRotationComponent::class)) {
+
+    lateinit var current: Interpolation
+
+    override fun onEntityAdded(entity: Entity) {
+        current = entity.get(TweenScaleComponent::class).tween.interpolation
+    }
+
+    override fun update(delta: Seconds, entity: Entity) {
+        val tweenComponent = entity.get(TweenRotationComponent::class)
+        entity.position.setLocalRotation(x = 0, y = tweenComponent.tween.current.value, z = 0)
+
+        with(ImGui) {
+            container("Rotation") {
+                label("Current Interpolation: $current")
+                if (button("Next interpolation")) {
+                    val index = Interpolations.all.indexOf(current)
+                    val newIndex = (index + 1) % Interpolations.all.size
+                    current = Interpolations.all[newIndex]
+                    tweenComponent.tween.interpolation = current
                 }
             }
         }
@@ -59,42 +83,20 @@ class TweeningGame(override val gameContext: GameContext) : Game {
         scene.getAll(ObjectType.MODEL).forEach {
             entityFactory.createFromNode(it).also { entity ->
                 with(entity) {
-                    val fields = Vector3(1f, 1f, 1f)
-                    val tween = Tweening.linear(1f)
-                        .fields(
-                            fields::x to 2f,
-                            fields::y to 2f,
-                            fields::z to 2f,
-                        )
-                        .build()
-
-                    add(TweenComponent("linear", false, tween, fields))
-                }
-
-                with(entity) {
-                    val fields = Vector3(1f, 1f, 1f)
-                    val tween = Tweening.elastic(1f)
-                        .fields(
-                            fields::x to 2f,
-                            fields::y to 2f,
-                            fields::z to 2f,
-                        )
-                        .build()
-
-                    add(TweenComponent("elastic", true, tween, fields))
-                }
-
-                with(entity) {
-                    val fields = Vector3(1f, 1f, 1f)
-                    val tween = Tweening.pow(1f)
-                        .fields(
-                            fields::x to 2f,
-                            fields::y to 2f,
-                            fields::z to 2f,
-                        )
-                        .build()
-
-                    add(TweenComponent("pow", false, tween, fields))
+                    val tweenFactory = TweenFactoryComponent()
+                    val tweenPosition = tweenFactory.vector3(
+                        start = entity.position.scale.mutable(),
+                        end = Vector3(2f, 2f, 2f),
+                        duration = 2f,
+                        interpolation = Interpolations.elastic,
+                        pingpong = true
+                    )
+                    val tweenRotation = tweenFactory.float(
+                        0f, 360f, 4f, Interpolations.pow2
+                    )
+                    add(tweenFactory)
+                    add(TweenScaleComponent(tweenPosition))
+                    add(TweenRotationComponent(tweenRotation))
                 }
             }
         }
@@ -104,6 +106,6 @@ class TweeningGame(override val gameContext: GameContext) : Game {
     }
 
     override fun createSystems(engine: Engine): List<System> {
-        return listOf(TweenSystem())
+        return listOf(TweenScaleSystem(), TweenRotationSystem())
     }
 }
